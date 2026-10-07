@@ -38,8 +38,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize App State
+        // Initialize App State & Firebase session
         AppState.init()
+        if (com.example.pasoaventuras.data.FirebaseManager.isUserLoggedIn) {
+            AppState.isLoggedIn = true
+            com.example.pasoaventuras.data.FirebaseManager.currentUser?.let { user ->
+                AppState.userEmail = user.email ?: AppState.userEmail
+                com.example.pasoaventuras.data.FirebaseManager.loadUserDataFromFirestore(user.uid)
+            }
+        }
 
         // Sensor initialization
         stepSensorManager = StepSensorManager(this)

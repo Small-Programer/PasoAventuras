@@ -378,8 +378,10 @@ fun PerfilScreen(onLogout: () -> Unit = {}) {
             // Botón Cerrar Sesión
             Button(
                 onClick = {
-                    AppState.isLoggedIn = false
-                    onLogout()
+                    com.example.pasoaventuras.data.FirebaseManager.logout {
+                        Toast.makeText(context, "Sesión cerrada correctamente", Toast.LENGTH_SHORT).show()
+                        onLogout()
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()

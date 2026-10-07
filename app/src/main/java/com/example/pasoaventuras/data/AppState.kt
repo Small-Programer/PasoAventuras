@@ -90,6 +90,7 @@ object AppState {
             val idx = missions.indexOf(mission)
             if (idx >= 0) missions[idx] = mission.copy(claimed = true)
             updateLevel()
+            FirebaseManager.saveUserDataToFirestore()
         }
     }
 
@@ -114,6 +115,7 @@ object AppState {
             missions[m3Index] = m3.copy(current = newCurrent)
         }
 
+        FirebaseManager.saveUserDataToFirestore()
         return pulled
     }
 
