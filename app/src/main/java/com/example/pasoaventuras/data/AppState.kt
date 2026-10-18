@@ -1,4 +1,4 @@
-﻿package com.example.pasoaventuras.data
+package com.example.pasoaventuras.data
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -61,6 +61,7 @@ object AppState {
                 Mission("m5", "Explorador Epico", "Acumula 15,000 pasos semanales", 15000, 0, 100, false, true),
             ))
         }
+        updateMissions()
     }
 
     fun reset() {
@@ -78,6 +79,7 @@ object AppState {
         isWalking = false
         ownedCards.clear()
         missions.clear()
+        init()
         stepsSinceLastSave = 0
     }
 

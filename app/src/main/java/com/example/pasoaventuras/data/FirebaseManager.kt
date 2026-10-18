@@ -167,6 +167,7 @@ object FirebaseManager {
                     }
 
                     // Misiones
+                    AppState.init()
                     @Suppress("UNCHECKED_CAST")
                     val claimedIds = doc.get("claimedMissionIds") as? List<String>
                     if (claimedIds != null) {
@@ -176,8 +177,10 @@ object FirebaseManager {
                             }
                         }
                     }
+                    AppState.init()
                 } else {
                     // Documento nuevo: guardamos el estado base inicial
+                    AppState.init()
                     saveUserDataToFirestore()
                 }
                 onFinished?.invoke()

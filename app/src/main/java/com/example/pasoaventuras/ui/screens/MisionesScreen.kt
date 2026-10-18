@@ -28,6 +28,10 @@ import com.example.pasoaventuras.ui.theme.*
 fun MisionesScreen() {
     val context = LocalContext.current
 
+    LaunchedEffect(Unit) {
+        AppState.init()
+    }
+
     var showConfetti by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
