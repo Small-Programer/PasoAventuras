@@ -350,31 +350,6 @@ fun PerfilScreen(onLogout: () -> Unit = {}) {
                 }
             }
 
-            // Botón Restablecer Datos de Prueba
-            Button(
-                onClick = {
-                    AppState.steps = 8432
-                    AppState.totalSteps = 48432
-                    AppState.coins = 120
-                    AppState.dailyGoal = 10000
-                    goalSliderValue = 10000f
-                    Toast.makeText(context, "🔄 Datos restablecidos con éxito", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Slate100),
-                border = BorderStroke(1.dp, Color(0xFFFCA5A5))
-            ) {
-                Text(
-                    text = "🗑️ Restablecer Datos de Prueba",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFDC2626)
-                )
-            }
-
             // Botón Cerrar Sesión
             Button(
                 onClick = {
