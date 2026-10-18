@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
         // Initialize App State & Firebase session
         AppState.init()
+        com.example.pasoaventuras.data.FirebaseManager.cleanupExpiredGuestUsers()
         if (com.example.pasoaventuras.data.FirebaseManager.isUserLoggedIn) {
             AppState.isLoggedIn = true
             com.example.pasoaventuras.data.FirebaseManager.currentUser?.let { user ->

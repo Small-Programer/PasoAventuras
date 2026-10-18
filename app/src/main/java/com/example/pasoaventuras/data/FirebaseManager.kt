@@ -101,9 +101,35 @@ object FirebaseManager {
     }
 
     /**
+     * Limpia usuarios invitados de Firestore cuya sesion tenga mas de 15 minutos (900,000 ms)
+     */
+    fun cleanupExpiredGuestUsers() {
+        val fifteenMinutesAgo = System.currentTimeMillis() - (15 * 60 * 1000L)
+        firestore.collection("users")
+            .whereEqualTo("isAnonymous", true)
+            .whereLessThan("updatedAt", fifteenMinutesAgo)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                for (doc in snapshot.documents) {
+                    doc.reference.delete()
+                }
+            }
+            .addOnFailureListener {
+                // Silencioso, no interrumpe el flujo del usuario
+            }
+    }
+
+    /**
      * Cerrar sesión
      */
     fun logout(onComplete: () -> Unit = {}) {
+        val user = currentUser
+        if (user != null && user.isAnonymous) {
+            // Si era un invitado, eliminar su documento en Firestore para no dejar usuarios fantasma
+            val uid = user.uid
+            firestore.collection("users").document(uid).delete()
+            user.delete()
+        }
         auth.signOut()
         AppState.reset()
         onComplete()
@@ -113,7 +139,8 @@ object FirebaseManager {
      * Guardar el estado de juego y tarjetas en Cloud Firestore
      */
     fun saveUserDataToFirestore(onComplete: ((Boolean) -> Unit)? = null) {
-        val uid = currentUser?.uid ?: return
+        val user = currentUser ?: return
+        val uid = user.uid
 
         val missionsProgress = AppState.missions.associate { mission ->
             mission.id to mapOf(
@@ -139,6 +166,7 @@ object FirebaseManager {
             "lastDailyDate" to AppState.lastDailyDate,
             "lastWeeklyYearWeek" to AppState.lastWeeklyYearWeek,
             "dailyStepsHistory" to AppState.dailyStepsHistory.toMap(),
+            "isAnonymous" to user.isAnonymous,
             "updatedAt" to System.currentTimeMillis()
         )
 
