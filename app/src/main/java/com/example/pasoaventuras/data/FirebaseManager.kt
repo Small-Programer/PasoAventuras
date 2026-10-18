@@ -105,7 +105,7 @@ object FirebaseManager {
      */
     fun logout(onComplete: () -> Unit = {}) {
         auth.signOut()
-        AppState.isLoggedIn = false
+        AppState.reset()
         onComplete()
     }
 

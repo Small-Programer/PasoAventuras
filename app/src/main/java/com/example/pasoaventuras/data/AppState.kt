@@ -1,4 +1,4 @@
-package com.example.pasoaventuras.data
+﻿package com.example.pasoaventuras.data
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -8,23 +8,23 @@ import androidx.compose.runtime.setValue
 
 object AppState {
     // User
-    var userName by mutableStateOf("Carlos Andrey")
-    var userEmail by mutableStateOf("carlos@correo.com")
-    var userAvatar by mutableStateOf("👑")
+    var userName by mutableStateOf("")
+    var userEmail by mutableStateOf("")
+    var userAvatar by mutableStateOf("Aventurero")
     var isLoggedIn by mutableStateOf(false)
-    var level by mutableIntStateOf(12)
-    var streak by mutableIntStateOf(5)
-    var xp by mutableIntStateOf(780)
+    var level by mutableIntStateOf(1)
+    var streak by mutableIntStateOf(0)
+    var xp by mutableIntStateOf(0)
 
     // Steps & Goals
-    var steps by mutableIntStateOf(8432)
-    var totalSteps by mutableIntStateOf(48432)
+    var steps by mutableIntStateOf(0)
+    var totalSteps by mutableIntStateOf(0)
     var dailyGoal by mutableIntStateOf(10000)
     var isSensorAvailable by mutableStateOf(false)
     var isWalking by mutableStateOf(false)
 
-    // Economy & Settings
-    var coins by mutableIntStateOf(120)  // 120 ChoyoCoins como en el HTML
+    // Economy
+    var coins by mutableIntStateOf(0)
     var audioEnabled by mutableStateOf(true)
 
     // Collection
@@ -33,6 +33,9 @@ object AppState {
     // Missions
     val missions = mutableStateListOf<Mission>()
     val hasUnclaimedMissions: Boolean get() = missions.any { it.isComplete && !it.claimed }
+
+    // Contador para guardar en Firebase cada N pasos
+    private var stepsSinceLastSave = 0
 
     // Derived
     val progress: Float get() = (steps.toFloat() / dailyGoal).coerceIn(0f, 1f)
@@ -51,21 +54,31 @@ object AppState {
     fun init() {
         if (missions.isEmpty()) {
             missions.addAll(listOf(
-                Mission("m1", "Paseo Matutino", "Camina 3,000 pasos hoy", 3000, 3000, 25, true, false),
-                Mission("m2", "Quema de Calorías", "Quema al menos 200 kcal", 5000, 5000, 30, true, false),
-                Mission("m3", "Invocador Novato", "Realiza 1 invocación en el Gacha", 1, 0, 40, false, false),
-                Mission("m4", "Maratón de Resistencia", "Alcanza 10,000 pasos en un solo día", 10000, steps, 60, false, false),
-                Mission("m5", "Explorador Épico", "Acumula 15,000 pasos semanales", 15000, steps, 100, false, true),
+                Mission("m1", "Paseo Matutino", "Camina 3,000 pasos hoy", 3000, 0, 25, false, false),
+                Mission("m2", "Quema de Calorias", "Quema al menos 200 kcal", 5000, 0, 30, false, false),
+                Mission("m3", "Invocador Novato", "Realiza 1 invocacion en el Gacha", 1, 0, 40, false, false),
+                Mission("m4", "Maraton de Resistencia", "Alcanza 10,000 pasos en un solo dia", 10000, 0, 60, false, false),
+                Mission("m5", "Explorador Epico", "Acumula 15,000 pasos semanales", 15000, 0, 100, false, true),
             ))
         }
+    }
 
-        // Cartas iniciales que ya tiene desbloqueadas en el HTML (IDs: 1, 2, 4, 11, 14)
-        if (ownedCards.isEmpty()) {
-            val initialCardIds = listOf("1", "2", "4", "11", "14")
-            CardRepository.allCards
-                .filter { initialCardIds.contains(it.id) }
-                .forEach { ownedCards.add(CardInstance(it)) }
-        }
+    fun reset() {
+        userName = ""
+        userEmail = ""
+        userAvatar = "Aventurero"
+        level = 1
+        streak = 0
+        xp = 0
+        steps = 0
+        totalSteps = 0
+        coins = 0
+        isLoggedIn = false
+        isSensorAvailable = false
+        isWalking = false
+        ownedCards.clear()
+        missions.clear()
+        stepsSinceLastSave = 0
     }
 
     fun addSteps(count: Int) {
@@ -74,12 +87,17 @@ object AppState {
         xp += (count / 20).coerceAtLeast(1)
 
         val coinsEarned = count / 100
-        if (coinsEarned > 0) {
-            coins += coinsEarned
-        }
+        if (coinsEarned > 0) coins += coinsEarned
 
         updateLevel()
         updateMissions()
+
+        // Guardar en Firebase cada 50 pasos para no saturar la base de datos
+        stepsSinceLastSave += count
+        if (stepsSinceLastSave >= 50) {
+            stepsSinceLastSave = 0
+            FirebaseManager.saveUserDataToFirestore()
+        }
     }
 
     fun claimMission(id: String) {
@@ -107,7 +125,6 @@ object AppState {
             pulled.add(instance)
         }
 
-        // Avanzar la misión de invocación (Invocador Novato)
         val m3Index = missions.indexOfFirst { it.id == "m3" }
         if (m3Index >= 0) {
             val m3 = missions[m3Index]
@@ -117,6 +134,13 @@ object AppState {
 
         FirebaseManager.saveUserDataToFirestore()
         return pulled
+    }
+
+    fun resetDailySteps() {
+        steps = 0
+        stepsSinceLastSave = 0
+        updateMissions()
+        FirebaseManager.saveUserDataToFirestore()
     }
 
     private fun updateLevel() {

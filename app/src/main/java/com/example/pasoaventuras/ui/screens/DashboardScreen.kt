@@ -19,23 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pasoaventuras.data.AppState
-import com.example.pasoaventuras.ui.components.SoundManager
 import com.example.pasoaventuras.ui.components.StepRing
 import com.example.pasoaventuras.ui.theme.*
-import kotlinx.coroutines.delay
 
 @Composable
 fun DashboardScreen() {
     val scrollState = rememberScrollState()
-
-    // Timer para la caminata en vivo continua si está activa
-    LaunchedEffect(AppState.isWalking) {
-        while (AppState.isWalking) {
-            delay(1000)
-            val randomSteps = (3..6).random()
-            AppState.addSteps(randomSteps)
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -69,13 +58,13 @@ fun DashboardScreen() {
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "¡Hola, ${AppState.userName}!",
+                        text = "¡Hola, ${AppState.userName.ifEmpty { "Aventurero" }}!",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Slate900
                     )
                     Text(
-                        text = "Nivel ${AppState.level} • Explorador Pro",
+                        text = "Nivel ${AppState.level} • ${AppState.levelTitle}",
                         fontSize = 12.sp,
                         color = Slate500,
                         fontWeight = FontWeight.SemiBold
@@ -83,11 +72,10 @@ fun DashboardScreen() {
                 }
             }
 
-            // Coin Badge con vector personalizado
             com.example.pasoaventuras.ui.components.ChoyoCoinsBadge(amount = AppState.coins)
         }
 
-        // Anillo Circular de Pasos (Card idéntica a .circle-progress-card)
+        // Anillo Circular de Pasos
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(26.dp),
@@ -124,7 +112,7 @@ fun DashboardScreen() {
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Choyo Companion Widget (.choyo-companion)
+        // Choyo Companion Widget
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -149,7 +137,7 @@ fun DashboardScreen() {
                     text = if (AppState.steps >= AppState.dailyGoal)
                         "\"¡FELICIDADES! ¡Meta superada con éxito! Reclama tus premios en Misiones.\" 🏆🎉"
                     else if (AppState.progressPercent < 30)
-                        "\"¡Un gran viaje comienza con el primer paso! Sal a estirar las piernas.\" 🐾"
+                        "\"¡Un gran viaje comienza con el primer paso! Sal a caminar un poco.\" 🐾"
                     else
                         "\"¡Vas con gran energía hoy! Solo te faltan unos pasos para tu recompensa.\" ⚡",
                     fontSize = 12.sp,
@@ -162,7 +150,7 @@ fun DashboardScreen() {
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Matriz de Métricas (.metrics-grid: 3 columnas)
+        // Matriz de Métricas
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -189,110 +177,49 @@ fun DashboardScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Simulador de Sensor de Hardware (.sensor-controller)
+        // Estado del Podómetro físico
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            colors = CardDefaults.cardColors(
+                containerColor = if (AppState.isSensorAvailable) Color(0xFFF0FDF4) else Color(0xFFFFFBEB)
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (AppState.isSensorAvailable) Color(0xFF86EFAC) else Color(0xFFFDE68A)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (AppState.isWalking || AppState.isSensorAvailable) Emerald500 else Slate400)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "SENSOR: TYPE_STEP_COUNTER",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Slate600,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                    Text(
-                        text = if (AppState.isSensorAvailable) "Sensor Nativo" else "Simulador",
-                        fontSize = 11.sp,
-                        color = Slate500,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Botones +100, +500, +1000
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            SoundManager.playStep()
-                            AppState.addSteps(100)
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Slate100),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text("+100", color = Slate900, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = {
-                            SoundManager.playStep()
-                            AppState.addSteps(500)
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Slate100),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text("+500", color = Slate900, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = {
-                            SoundManager.playStep()
-                            AppState.addSteps(1000)
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Slate100),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text("+1,000", color = Slate900, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Botón Caminata en Vivo Continua (.toggle-walk-btn)
-                Button(
-                    onClick = {
-                        SoundManager.playClick()
-                        AppState.isWalking = !AppState.isWalking
-                    },
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (AppState.isWalking) Color(0xFFFEE2E2) else Slate100
-                    )
-                ) {
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (AppState.isSensorAvailable) Color(0xFF22C55E) else Color(0xFFF59E0B)
+                        )
+                )
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (AppState.isWalking) "🛑 Detener Caminata Activa (+5 pasos/s)" else "🚶‍♂️ Simular Caminata en Vivo: APAGADA",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (AppState.isWalking) Color(0xFFDC2626) else Slate700
+                        text = if (AppState.isSensorAvailable) "Podómetro activo" else "Podómetro no disponible",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (AppState.isSensorAvailable) Color(0xFF166534) else Color(0xFF92400E)
+                    )
+                    Text(
+                        text = if (AppState.isSensorAvailable)
+                            "Contando pasos con el sensor físico del dispositivo"
+                        else
+                            "Este dispositivo no tiene sensor de pasos o no se otorgaron permisos",
+                        fontSize = 11.sp,
+                        color = if (AppState.isSensorAvailable) Color(0xFF4ADE80) else Color(0xFFD97706),
+                        lineHeight = 14.sp
                     )
                 }
             }
