@@ -115,6 +115,13 @@ object FirebaseManager {
     fun saveUserDataToFirestore(onComplete: ((Boolean) -> Unit)? = null) {
         val uid = currentUser?.uid ?: return
 
+        val missionsProgress = AppState.missions.associate { mission ->
+            mission.id to mapOf(
+                "current" to mission.current,
+                "claimed" to mission.claimed
+            )
+        }
+
         val userDoc = hashMapOf(
             "userName" to AppState.userName,
             "userEmail" to AppState.userEmail,
@@ -128,6 +135,7 @@ object FirebaseManager {
             "coins" to AppState.coins,
             "ownedCardIds" to AppState.ownedCards.map { it.card.id },
             "claimedMissionIds" to AppState.missions.filter { it.claimed }.map { it.id },
+            "missionsProgress" to missionsProgress,
             "updatedAt" to System.currentTimeMillis()
         )
 
@@ -166,14 +174,31 @@ object FirebaseManager {
                         }
                     }
 
-                    // Misiones
+                    // Misiones propias de este usuario
                     AppState.init()
                     @Suppress("UNCHECKED_CAST")
-                    val claimedIds = doc.get("claimedMissionIds") as? List<String>
-                    if (claimedIds != null) {
+                    val missionsProgress = doc.get("missionsProgress") as? Map<String, Map<String, Any>>
+                    if (missionsProgress != null) {
                         AppState.missions.forEachIndexed { index, mission ->
-                            if (claimedIds.contains(mission.id)) {
-                                AppState.missions[index] = mission.copy(claimed = true)
+                            val saved = missionsProgress[mission.id]
+                            if (saved != null) {
+                                val currentVal = (saved["current"] as? Number)?.toInt() ?: mission.current
+                                val claimedVal = saved["claimed"] as? Boolean ?: mission.claimed
+                                AppState.missions[index] = mission.copy(
+                                    current = currentVal,
+                                    claimed = claimedVal
+                                )
+                            }
+                        }
+                    } else {
+                        // Compatibilidad hacia atras con claimedMissionIds
+                        @Suppress("UNCHECKED_CAST")
+                        val claimedIds = doc.get("claimedMissionIds") as? List<String>
+                        if (claimedIds != null) {
+                            AppState.missions.forEachIndexed { index, mission ->
+                                if (claimedIds.contains(mission.id)) {
+                                    AppState.missions[index] = mission.copy(claimed = true)
+                                }
                             }
                         }
                     }
