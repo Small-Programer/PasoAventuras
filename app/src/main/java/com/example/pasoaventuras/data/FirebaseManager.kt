@@ -136,6 +136,8 @@ object FirebaseManager {
             "ownedCardIds" to AppState.ownedCards.map { it.card.id },
             "claimedMissionIds" to AppState.missions.filter { it.claimed }.map { it.id },
             "missionsProgress" to missionsProgress,
+            "lastDailyDate" to AppState.lastDailyDate,
+            "lastWeeklyYearWeek" to AppState.lastWeeklyYearWeek,
             "updatedAt" to System.currentTimeMillis()
         )
 
@@ -174,6 +176,9 @@ object FirebaseManager {
                         }
                     }
 
+                    doc.getString("lastDailyDate")?.let { AppState.lastDailyDate = it }
+                    doc.getString("lastWeeklyYearWeek")?.let { AppState.lastWeeklyYearWeek = it }
+
                     // Misiones propias de este usuario
                     AppState.init()
                     @Suppress("UNCHECKED_CAST")
@@ -202,7 +207,9 @@ object FirebaseManager {
                             }
                         }
                     }
-                    AppState.init()
+
+                    // Verificar si ya paso un nuevo dia o semana para reiniciar misiones
+                    AppState.checkAndResetMissionsBySchedule()
                 } else {
                     // Documento nuevo: guardamos el estado base inicial
                     AppState.init()

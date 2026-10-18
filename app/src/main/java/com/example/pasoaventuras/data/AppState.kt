@@ -51,6 +51,67 @@ object AppState {
         else -> "Explorador Legendario"
     }
 
+    // Tracking de fecha y semana para reinicio de misiones
+    var lastDailyDate by mutableStateOf("")
+    var lastWeeklyYearWeek by mutableStateOf("")
+
+    private fun getCurrentDateKey(): String {
+        val cal = java.util.Calendar.getInstance()
+        return "%04d-%02d-%02d".format(
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    private fun getCurrentYearWeekKey(): String {
+        val cal = java.util.Calendar.getInstance()
+        return "%04d-W%02d".format(
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.WEEK_OF_YEAR)
+        )
+    }
+
+    fun checkAndResetMissionsBySchedule() {
+        val today = getCurrentDateKey()
+        val thisWeek = getCurrentYearWeekKey()
+        var changed = false
+
+        if (lastDailyDate.isNotEmpty() && lastDailyDate != today) {
+            // Nuevo dia: reiniciar misiones diarias y pasos del dia
+            steps = 0
+            missions.forEachIndexed { index, mission ->
+                if (!mission.isWeekly) {
+                    missions[index] = mission.copy(current = 0, claimed = false)
+                }
+            }
+            lastDailyDate = today
+            changed = true
+        } else if (lastDailyDate.isEmpty()) {
+            lastDailyDate = today
+            changed = true
+        }
+
+        if (lastWeeklyYearWeek.isNotEmpty() && lastWeeklyYearWeek != thisWeek) {
+            // Nueva semana: reiniciar misiones semanales
+            missions.forEachIndexed { index, mission ->
+                if (mission.isWeekly) {
+                    missions[index] = mission.copy(current = 0, claimed = false)
+                }
+            }
+            lastWeeklyYearWeek = thisWeek
+            changed = true
+        } else if (lastWeeklyYearWeek.isEmpty()) {
+            lastWeeklyYearWeek = thisWeek
+            changed = true
+        }
+
+        updateMissions()
+        if (changed && isLoggedIn) {
+            FirebaseManager.saveUserDataToFirestore()
+        }
+    }
+
     fun init() {
         if (missions.isEmpty()) {
             missions.addAll(listOf(
@@ -61,7 +122,7 @@ object AppState {
                 Mission("m5", "Explorador Epico", "Acumula 15,000 pasos semanales", 15000, 0, 100, false, true),
             ))
         }
-        updateMissions()
+        checkAndResetMissionsBySchedule()
     }
 
     fun reset() {
@@ -77,6 +138,8 @@ object AppState {
         isLoggedIn = false
         isSensorAvailable = false
         isWalking = false
+        lastDailyDate = ""
+        lastWeeklyYearWeek = ""
         ownedCards.clear()
         missions.clear()
         init()
