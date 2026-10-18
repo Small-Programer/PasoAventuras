@@ -138,6 +138,7 @@ object FirebaseManager {
             "missionsProgress" to missionsProgress,
             "lastDailyDate" to AppState.lastDailyDate,
             "lastWeeklyYearWeek" to AppState.lastWeeklyYearWeek,
+            "dailyStepsHistory" to AppState.dailyStepsHistory.toMap(),
             "updatedAt" to System.currentTimeMillis()
         )
 
@@ -178,6 +179,17 @@ object FirebaseManager {
 
                     doc.getString("lastDailyDate")?.let { AppState.lastDailyDate = it }
                     doc.getString("lastWeeklyYearWeek")?.let { AppState.lastWeeklyYearWeek = it }
+
+                    // Historial de pasos diarios
+                    @Suppress("UNCHECKED_CAST")
+                    val history = doc.get("dailyStepsHistory") as? Map<String, Any>
+                    if (history != null) {
+                        AppState.dailyStepsHistory.clear()
+                        history.forEach { (dateKey, stepVal) ->
+                            val s = (stepVal as? Number)?.toInt() ?: 0
+                            AppState.dailyStepsHistory[dateKey] = s
+                        }
+                    }
 
                     // Misiones propias de este usuario
                     AppState.init()

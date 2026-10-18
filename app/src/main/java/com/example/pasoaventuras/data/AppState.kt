@@ -3,6 +3,7 @@ package com.example.pasoaventuras.data
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
@@ -55,7 +56,10 @@ object AppState {
     var lastDailyDate by mutableStateOf("")
     var lastWeeklyYearWeek by mutableStateOf("")
 
-    private fun getCurrentDateKey(): String {
+    // Historial de pasos por fecha (ej. "2026-10-18" -> 4520)
+    val dailyStepsHistory = mutableStateMapOf<String, Int>()
+
+    fun getCurrentDateKey(): String {
         val cal = java.util.Calendar.getInstance()
         return "%04d-%02d-%02d".format(
             cal.get(java.util.Calendar.YEAR),
@@ -140,6 +144,7 @@ object AppState {
         isWalking = false
         lastDailyDate = ""
         lastWeeklyYearWeek = ""
+        dailyStepsHistory.clear()
         ownedCards.clear()
         missions.clear()
         init()
@@ -150,6 +155,9 @@ object AppState {
         steps += count
         totalSteps += count
         xp += (count / 20).coerceAtLeast(1)
+
+        val todayKey = getCurrentDateKey()
+        dailyStepsHistory[todayKey] = steps
 
         val coinsEarned = count / 100
         if (coinsEarned > 0) coins += coinsEarned

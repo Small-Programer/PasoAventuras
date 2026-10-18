@@ -185,6 +185,14 @@ fun PerfilScreen(onLogout: () -> Unit = {}) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Gráfica de Historial Semanal de Pasos (Estilo Bienestar Digital)
+        StepHistoryChart(
+            history = AppState.dailyStepsHistory,
+            dailyGoal = AppState.dailyGoal
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // 3. Banner Freemium PasoAventuras Pro (.pro-banner)
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -374,5 +382,193 @@ fun PerfilScreen(onLogout: () -> Unit = {}) {
         }
 
         Spacer(modifier = Modifier.height(26.dp))
+    }
+}
+
+data class DayStepData(
+    val dayLabel: String,
+    val dateKey: String,
+    val steps: Int,
+    val isToday: Boolean
+)
+
+@Composable
+fun StepHistoryChart(
+    history: Map<String, Int>,
+    dailyGoal: Int
+) {
+    val cal = java.util.Calendar.getInstance()
+    val todayKey = "%04d-%02d-%02d".format(
+        cal.get(java.util.Calendar.YEAR),
+        cal.get(java.util.Calendar.MONTH) + 1,
+        cal.get(java.util.Calendar.DAY_OF_MONTH)
+    )
+
+    val dayNames = listOf("Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb")
+    val past7Days = remember(history, todayKey) {
+        val list = mutableListOf<DayStepData>()
+        val tempCal = java.util.Calendar.getInstance()
+        // Ir hacia atrás 6 días para mostrar de hace 6 días hasta hoy (7 días en total)
+        tempCal.add(java.util.Calendar.DAY_OF_YEAR, -6)
+        for (i in 0..6) {
+            val key = "%04d-%02d-%02d".format(
+                tempCal.get(java.util.Calendar.YEAR),
+                tempCal.get(java.util.Calendar.MONTH) + 1,
+                tempCal.get(java.util.Calendar.DAY_OF_MONTH)
+            )
+            val dayOfWeek = tempCal.get(java.util.Calendar.DAY_OF_WEEK) - 1
+            val stepCount = history[key] ?: 0
+            list.add(
+                DayStepData(
+                    dayLabel = dayNames[dayOfWeek],
+                    dateKey = key,
+                    steps = stepCount,
+                    isToday = key == todayKey
+                )
+            )
+            tempCal.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        list
+    }
+
+    val maxSteps = maxOf(dailyGoal, past7Days.maxOfOrNull { it.steps } ?: 1, 1000)
+    val totalWeeklySteps = past7Days.sumOf { it.steps }
+    val avgSteps = totalWeeklySteps / 7
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "HISTORIAL DE ACTIVIDAD",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Slate500,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Últimos 7 días",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Slate900
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFFEFF6FF),
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                ) {
+                    Text(
+                        text = "Prom: %,d / día".format(avgSteps),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Indigo700,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Gráfica de barras
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                past7Days.forEach { day ->
+                    val barHeightRatio = (day.steps.toFloat() / maxSteps).coerceIn(0.04f, 1f)
+                    val goalReached = day.steps >= dailyGoal
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        // Cantidad arriba si es mayor a 0
+                        if (day.steps > 0) {
+                            Text(
+                                text = if (day.steps >= 1000) "%.1fk".format(day.steps / 1000f) else "${day.steps}",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (day.isToday) Indigo700 else Slate400
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+
+                        // Barra
+                        Box(
+                            modifier = Modifier
+                                .width(22.dp)
+                                .fillMaxHeight(barHeightRatio)
+                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                .background(
+                                    when {
+                                        goalReached -> Color(0xFF10B981) // Verde meta cumplida
+                                        day.isToday -> Indigo500         // Índigo hoy
+                                        day.steps > 0 -> Color(0xFF818CF8) // Lavanda pasos dados
+                                        else -> Slate200                  // Gris vacío
+                                    }
+                                )
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Etiqueta del día
+                        Text(
+                            text = day.dayLabel,
+                            fontSize = 11.sp,
+                            fontWeight = if (day.isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
+                            color = if (day.isToday) Indigo500 else Slate500
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Leyenda informativa
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF10B981))
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(text = "Meta superada", fontSize = 10.sp, color = Slate500)
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Indigo500)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(text = "Hoy", fontSize = 10.sp, color = Slate500)
+            }
+        }
     }
 }
