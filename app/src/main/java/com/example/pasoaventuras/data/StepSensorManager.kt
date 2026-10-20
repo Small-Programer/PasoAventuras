@@ -5,22 +5,29 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 class StepSensorManager(context: Context) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    
-    // Preferir detector de paso (1 evento = 1 paso exacto), sino contador, sino acelerómetro
+
+    // Sensores de podómetro nativos (por hardware)
     private val stepDetector: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
     private val stepCounter: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
+    private var activeSensorType: Int = 0
+
+    // Para TYPE_STEP_COUNTER
     private var sessionStartCounter = -1L
     private var lastCounterVal = -1L
 
-    // Variables para algoritmo de respaldo con acelerómetro
-    private var lastAccelMagnitude = 0f
+    // Para acelerómetro: Filtro de paso alto y orientación invariante
+    private var gravity = FloatArray(3)
+    private var linearAcceleration = FloatArray(3)
+    private var lastLinearMag = 0f
+    private var isPeak = false
     private var lastStepTimestamp = 0L
 
     val isAvailable: Boolean 
@@ -29,29 +36,34 @@ class StepSensorManager(context: Context) : SensorEventListener {
     fun startListening() {
         var registered = false
 
+        // 1. PRIORIDAD MÁXIMA: Hardware Step Detector (no depende de orientación, el chip calcula la pisada)
         if (stepDetector != null) {
             registered = sensorManager.registerListener(
                 this, 
                 stepDetector, 
-                SensorManager.SENSOR_DELAY_GAME
+                SensorManager.SENSOR_DELAY_FASTEST
             )
+            if (registered) activeSensorType = Sensor.TYPE_STEP_DETECTOR
         }
 
+        // 2. SEGUNDA PRIORIDAD: Hardware Step Counter
         if (!registered && stepCounter != null) {
             registered = sensorManager.registerListener(
                 this, 
                 stepCounter, 
                 SensorManager.SENSOR_DELAY_UI
             )
+            if (registered) activeSensorType = Sensor.TYPE_STEP_COUNTER
         }
 
-        // Si el teléfono no tiene podómetro de hardware dedicado, usar acelerómetro
+        // 3. TERCERA PRIORIDAD: Acelerómetro universal filtrando gravedad
         if (!registered && accelerometer != null) {
             registered = sensorManager.registerListener(
                 this,
                 accelerometer,
                 SensorManager.SENSOR_DELAY_GAME
             )
+            if (registered) activeSensorType = Sensor.TYPE_ACCELEROMETER
         }
 
         AppState.isSensorAvailable = registered
@@ -61,17 +73,22 @@ class StepSensorManager(context: Context) : SensorEventListener {
     fun stopListening() {
         sensorManager.unregisterListener(this)
         AppState.isWalking = false
+        sessionStartCounter = -1L
+        lastCounterVal = -1L
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
 
+        // Solo procesamos el sensor activo principal para evitar contar doble
+        if (event.sensor.type != activeSensorType) return
+
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> {
-                // Cada evento representa exactamente 1 paso detectado
-                val stepsCount = event.values[0].toInt()
-                if (stepsCount > 0) {
-                    AppState.addSteps(stepsCount)
+                // El procesador del teléfono ya validó que es un paso real (no se deja engañar por agitar)
+                val count = event.values[0].toInt()
+                if (count > 0) {
+                    AppState.addSteps(count)
                 }
             }
 
@@ -83,28 +100,57 @@ class StepSensorManager(context: Context) : SensorEventListener {
                     return
                 }
                 val delta = currentTotal - lastCounterVal
-                if (delta in 1..100) {
+                if (delta in 1..25) {
                     AppState.addSteps(delta.toInt())
                 }
                 lastCounterVal = currentTotal
             }
 
             Sensor.TYPE_ACCELEROMETER -> {
-                // Algoritmo de detección de picos de aceleración (reserva universal)
-                val x = event.values[0]
-                val y = event.values[1]
-                val z = event.values[2]
-                val magnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+                // Algoritmo aislado de orientación:
+                // Paso 1: Filtro pasa-bajas para aislar la gravedad (9.8 m/s²) sin importar si está horizontal o vertical
+                val alpha = 0.8f
+                gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+                gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+                gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
 
-                val deltaMagnitude = magnitude - lastAccelMagnitude
-                lastAccelMagnitude = magnitude
+                // Paso 2: Restar gravedad para obtener aceleración lineal pura
+                linearAcceleration[0] = event.values[0] - gravity[0]
+                linearAcceleration[1] = event.values[1] - gravity[1]
+                linearAcceleration[2] = event.values[2] - gravity[2]
+
+                // Paso 3: Magnitud escalar (es idéntica en horizontal, vertical o bolsillo)
+                val lx = linearAcceleration[0]
+                val ly = linearAcceleration[1]
+                val lz = linearAcceleration[2]
+                val currentMag = sqrt((lx * lx + ly * ly + lz * lz).toDouble()).toFloat()
 
                 val now = System.currentTimeMillis()
-                // Umbral dinámico para evitar falsos positivos y rebotes (< 300 ms entre pasos)
-                if (deltaMagnitude > 3.2f && (now - lastStepTimestamp) > 320) {
-                    lastStepTimestamp = now
-                    AppState.addSteps(1)
+
+                // Paso 4: Detección de paso humano con patrón pico-valle:
+                // Una pisada real genera entre 1.8 y 7.0 m/s². Agitar el celular genera picos erráticos > 9.0 o continuos.
+                if (currentMag > 2.0f && currentMag < 7.5f) {
+                    if (currentMag > lastLinearMag) {
+                        isPeak = true
+                    } else if (isPeak && (lastLinearMag - currentMag) > 0.4f) {
+                        isPeak = false
+                        // Una zancada humana al caminar toma entre 360 ms y 1200 ms (máximo ~2.7 pasos por segundo)
+                        val elapsed = now - lastStepTimestamp
+                        if (elapsed in 360..1300) {
+                            lastStepTimestamp = now
+                            AppState.addSteps(1)
+                        } else if (elapsed > 1300) {
+                            // Primer paso después de estar detenido
+                            lastStepTimestamp = now
+                            AppState.addSteps(1)
+                        }
+                    }
+                } else if (currentMag >= 7.5f) {
+                    // Si el movimiento es muy brusco (agitar con la mano rápido), se descarta
+                    isPeak = false
                 }
+
+                lastLinearMag = currentMag
             }
         }
     }
