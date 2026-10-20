@@ -24,6 +24,19 @@ object AppState {
     var isSensorAvailable by mutableStateOf(false)
     var isWalking by mutableStateOf(false)
 
+    // Tipo de podometro: true = chip de hardware dedicado, false = acelerometro de respaldo
+    var hasHardwarePedometer by mutableStateOf(true)
+
+    // GPS (complementario al podometro)
+    var isGpsActive by mutableStateOf(false)
+    var isInVehicle by mutableStateOf(false)
+    var currentSpeedKmh by mutableStateOf(0f)
+    var gpsDistanceKm by mutableStateOf(0f)
+
+    fun addGpsDistance(km: Float) {
+        gpsDistanceKm += km
+    }
+
     // Economy
     var coins by mutableIntStateOf(0)
     var audioEnabled by mutableStateOf(true)
@@ -41,7 +54,8 @@ object AppState {
     // Derived
     val progress: Float get() = (steps.toFloat() / dailyGoal).coerceIn(0f, 1f)
     val progressPercent: Int get() = (progress * 100).toInt()
-    val distanceKm: Float get() = steps * 0.00075f
+    // Distancia: si hay medicion GPS se usa la real, si no se estima por zancada promedio (0.75 m)
+    val distanceKm: Float get() = if (gpsDistanceKm > 0.01f) gpsDistanceKm else steps * 0.00075f
     val caloriesBurned: Int get() = (steps * 0.04f).toInt()
 
     val levelTitle: String get() = when (level) {
@@ -87,6 +101,7 @@ object AppState {
                 dailyStepsHistory[lastDailyDate] = steps
             }
             steps = 0
+            gpsDistanceKm = 0f
             missions.forEachIndexed { index, mission ->
                 if (!mission.isWeekly) {
                     missions[index] = mission.copy(current = 0, claimed = false)
@@ -144,6 +159,9 @@ object AppState {
         isWalking = false
         lastDailyDate = ""
         lastWeeklyYearWeek = ""
+        gpsDistanceKm = 0f
+        isInVehicle = false
+        currentSpeedKmh = 0f
         dailyStepsHistory.clear()
         ownedCards.clear()
         missions.clear()
@@ -152,6 +170,8 @@ object AppState {
     }
 
     fun addSteps(count: Int) {
+        // Anti-trampa: si el GPS detecta velocidad de vehiculo, no se suman pasos
+        if (isInVehicle) return
         steps += count
         totalSteps += count
         xp += (count / 20).coerceAtLeast(1)

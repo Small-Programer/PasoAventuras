@@ -166,6 +166,7 @@ object FirebaseManager {
             "lastDailyDate" to AppState.lastDailyDate,
             "lastWeeklyYearWeek" to AppState.lastWeeklyYearWeek,
             "dailyStepsHistory" to AppState.dailyStepsHistory.toMap(),
+            "gpsDistanceKm" to AppState.gpsDistanceKm.toDouble(),
             "isAnonymous" to user.isAnonymous,
             "updatedAt" to System.currentTimeMillis()
         )
@@ -192,6 +193,7 @@ object FirebaseManager {
                     doc.getLong("totalSteps")?.let { AppState.totalSteps = it.toInt() }
                     doc.getLong("dailyGoal")?.let { AppState.dailyGoal = it.toInt() }
                     doc.getLong("coins")?.let { AppState.coins = it.toInt() }
+                    doc.getDouble("gpsDistanceKm")?.let { AppState.gpsDistanceKm = it.toFloat() }
 
                     // Tarjetas
                     @Suppress("UNCHECKED_CAST")

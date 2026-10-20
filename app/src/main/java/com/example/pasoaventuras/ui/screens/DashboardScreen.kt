@@ -177,7 +177,45 @@ fun DashboardScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Estado del Podómetro físico
+        // Alerta si va en vehículo
+        if (AppState.isInVehicle) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFEF2F2)
+                ),
+                border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(text = "🚗", fontSize = 24.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Modo vehículo detectado",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF991B1B)
+                        )
+                        Text(
+                            text = "Velocidad: ${AppState.currentSpeedKmh.toInt()} km/h. El conteo de pasos está pausado para evitar pasos falsos.",
+                            fontSize = 11.sp,
+                            color = Color(0xFFB91C1C),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Estado del Podómetro físico y GPS
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -190,37 +228,88 @@ fun DashboardScreen() {
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Fila Podómetro
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (AppState.isSensorAvailable) Color(0xFF22C55E) else Color(0xFFF59E0B)
+                            )
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        val title = when {
+                            !AppState.isSensorAvailable -> "Podómetro no disponible"
+                            AppState.hasHardwarePedometer -> "Podómetro por hardware activo"
+                            else -> "Podómetro por acelerómetro (Calibrado)"
+                        }
+                        val desc = when {
+                            !AppState.isSensorAvailable -> "No se detectó sensor de movimiento o faltan permisos"
+                            AppState.hasHardwarePedometer -> "Sensor físico dedicado de pasos funcionando"
+                            else -> "Acelerómetro calibrado con filtro dinámico y anti-rebote"
+                        }
+                        Text(
+                            text = title,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (AppState.isSensorAvailable) Color(0xFF166534) else Color(0xFF92400E)
+                        )
+                        Text(
+                            text = desc,
+                            fontSize = 11.sp,
+                            color = if (AppState.isSensorAvailable) Color(0xFF15803D) else Color(0xFFD97706),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (AppState.isSensorAvailable) Color(0xFF22C55E) else Color(0xFFF59E0B)
-                        )
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(if (AppState.isSensorAvailable) Color(0xFFDCFCE7) else Color(0xFFFEF3C7))
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (AppState.isSensorAvailable) "Podómetro activo" else "Podómetro no disponible",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (AppState.isSensorAvailable) Color(0xFF166534) else Color(0xFF92400E)
+
+                // Fila GPS
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (AppState.isGpsActive) Color(0xFF0EA5E9) else Color(0xFF94A3B8)
+                            )
                     )
-                    Text(
-                        text = if (AppState.isSensorAvailable)
-                            "Contando pasos con el sensor físico del dispositivo"
-                        else
-                            "Este dispositivo no tiene sensor de pasos o no se otorgaron permisos",
-                        fontSize = 11.sp,
-                        color = if (AppState.isSensorAvailable) Color(0xFF4ADE80) else Color(0xFFD97706),
-                        lineHeight = 14.sp
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (AppState.isGpsActive) "GPS activo (Validación de distancia)" else "GPS conectando / inactivo",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (AppState.isGpsActive) Color(0xFF0369A1) else Color(0xFF475569)
+                        )
+                        Text(
+                            text = if (AppState.isGpsActive)
+                                "Distancia GPS: ${String.format(java.util.Locale.US, "%.2f", AppState.gpsDistanceKm)} km · Velocidad: ${AppState.currentSpeedKmh.toInt()} km/h"
+                            else
+                                "Permite mayor precisión y detección de transporte",
+                            fontSize = 11.sp,
+                            color = if (AppState.isGpsActive) Color(0xFF0284C7) else Color(0xFF64748B),
+                            lineHeight = 14.sp
+                        )
+                    }
                 }
             }
         }

@@ -30,6 +30,10 @@ class StepSensorManager(context: Context) : SensorEventListener {
     private var isPeak = false
     private var lastStepTimestamp = 0L
 
+    // true si el dispositivo tiene chip de podometro dedicado (no solo acelerometro)
+    val hasHardwarePedometer: Boolean
+        get() = stepDetector != null || stepCounter != null
+
     val isAvailable: Boolean 
         get() = stepDetector != null || stepCounter != null || accelerometer != null
 
@@ -67,6 +71,8 @@ class StepSensorManager(context: Context) : SensorEventListener {
         }
 
         AppState.isSensorAvailable = registered
+        AppState.hasHardwarePedometer = activeSensorType == Sensor.TYPE_STEP_DETECTOR ||
+                activeSensorType == Sensor.TYPE_STEP_COUNTER
         AppState.isWalking = registered
     }
 
