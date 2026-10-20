@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.pasoaventuras.data.AppState
+import com.example.pasoaventuras.data.FirebaseManager
 import com.example.pasoaventuras.data.StepSensorManager
 import com.example.pasoaventuras.ui.components.BottomNavBar
 import com.example.pasoaventuras.ui.screens.*
@@ -30,41 +31,28 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted) {
-            stepSensorManager.startListening()
-        }
+        stepSensorManager.startListening()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize App State & Firebase session
-        AppState.init()
-        com.example.pasoaventuras.data.FirebaseManager.cleanupExpiredGuestUsers()
-        if (com.example.pasoaventuras.data.FirebaseManager.isUserLoggedIn) {
-            AppState.isLoggedIn = true
-            com.example.pasoaventuras.data.FirebaseManager.currentUser?.let { user ->
-                AppState.userEmail = user.email ?: AppState.userEmail
-                com.example.pasoaventuras.data.FirebaseManager.loadUserDataFromFirestore(user.uid)
-            }
-        }
-
-        // Sensor initialization
+        // Inicializar sensor
         stepSensorManager = StepSensorManager(this)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACTIVITY_RECOGNITION
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                stepSensorManager.startListening()
-            } else {
-                requestPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        // Estado inicial
+        AppState.init()
+        FirebaseManager.cleanupExpiredGuestUsers()
+
+        if (FirebaseManager.isUserLoggedIn) {
+            AppState.isLoggedIn = true
+            FirebaseManager.currentUser?.let { user ->
+                AppState.userEmail = user.email ?: AppState.userEmail
+                FirebaseManager.loadUserDataFromFirestore(user.uid)
             }
-        } else {
-            stepSensorManager.startListening()
         }
+
+        checkAndRequestSensorPermission()
 
         setContent {
             PasoAventurasTheme {
@@ -78,6 +66,7 @@ class MainActivity : ComponentActivity() {
                     LoginScreen(
                         onLoginSuccess = {
                             isLoggedIn = true
+                            checkAndRequestSensorPermission()
                         }
                     )
                 } else {
@@ -131,6 +120,27 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun checkAndRequestSensorPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                stepSensorManager.startListening()
+            } else {
+                requestPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+        } else {
+            stepSensorManager.startListening()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        stepSensorManager.startListening()
     }
 
     override fun onDestroy() {

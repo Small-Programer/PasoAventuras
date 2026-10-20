@@ -81,8 +81,11 @@ object AppState {
         val thisWeek = getCurrentYearWeekKey()
         var changed = false
 
+        // Solo si ya teníamos una fecha previa registrada y hoy es un día distinto
         if (lastDailyDate.isNotEmpty() && lastDailyDate != today) {
-            // Nuevo dia: reiniciar misiones diarias y pasos del dia
+            if (steps > 0) {
+                dailyStepsHistory[lastDailyDate] = steps
+            }
             steps = 0
             missions.forEachIndexed { index, mission ->
                 if (!mission.isWeekly) {
@@ -93,11 +96,9 @@ object AppState {
             changed = true
         } else if (lastDailyDate.isEmpty()) {
             lastDailyDate = today
-            changed = true
         }
 
         if (lastWeeklyYearWeek.isNotEmpty() && lastWeeklyYearWeek != thisWeek) {
-            // Nueva semana: reiniciar misiones semanales
             missions.forEachIndexed { index, mission ->
                 if (mission.isWeekly) {
                     missions[index] = mission.copy(current = 0, claimed = false)
@@ -107,7 +108,6 @@ object AppState {
             changed = true
         } else if (lastWeeklyYearWeek.isEmpty()) {
             lastWeeklyYearWeek = thisWeek
-            changed = true
         }
 
         updateMissions()
@@ -126,7 +126,7 @@ object AppState {
                 Mission("m5", "Explorador Epico", "Acumula 15,000 pasos semanales", 15000, 0, 100, false, true),
             ))
         }
-        checkAndResetMissionsBySchedule()
+        updateMissions()
     }
 
     fun reset() {
@@ -165,9 +165,9 @@ object AppState {
         updateLevel()
         updateMissions()
 
-        // Guardar en Firebase cada 50 pasos para no saturar la base de datos
+        // Guardar en Firebase cada 20 pasos para que se refleje rápido en la nube
         stepsSinceLastSave += count
-        if (stepsSinceLastSave >= 50) {
+        if (stepsSinceLastSave >= 20) {
             stepsSinceLastSave = 0
             FirebaseManager.saveUserDataToFirestore()
         }

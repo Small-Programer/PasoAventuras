@@ -1,33 +1,61 @@
-﻿package com.example.pasoaventuras.data
+package com.example.pasoaventuras.data
 
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import kotlin.math.sqrt
 
 class StepSensorManager(context: Context) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    
+    // Preferir detector de paso (1 evento = 1 paso exacto), sino contador, sino acelerómetro
+    private val stepDetector: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+    private val stepCounter: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-    // Valor total del sensor en el arranque de la sesion (se establece al primer evento)
-    private var sessionStartSteps = -1L
+    private var sessionStartCounter = -1L
+    private var lastCounterVal = -1L
 
-    // Ultima lectura del sensor para calcular el delta (pasos nuevos)
-    private var lastSensorValue = -1L
+    // Variables para algoritmo de respaldo con acelerómetro
+    private var lastAccelMagnitude = 0f
+    private var lastStepTimestamp = 0L
 
-    val isAvailable: Boolean get() = stepSensor != null
+    val isAvailable: Boolean 
+        get() = stepDetector != null || stepCounter != null || accelerometer != null
 
     fun startListening() {
-        if (stepSensor != null) {
-            sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
-            AppState.isSensorAvailable = true
-            AppState.isWalking = true
-        } else {
-            AppState.isSensorAvailable = false
-            AppState.isWalking = false
+        var registered = false
+
+        if (stepDetector != null) {
+            registered = sensorManager.registerListener(
+                this, 
+                stepDetector, 
+                SensorManager.SENSOR_DELAY_GAME
+            )
         }
+
+        if (!registered && stepCounter != null) {
+            registered = sensorManager.registerListener(
+                this, 
+                stepCounter, 
+                SensorManager.SENSOR_DELAY_UI
+            )
+        }
+
+        // Si el teléfono no tiene podómetro de hardware dedicado, usar acelerómetro
+        if (!registered && accelerometer != null) {
+            registered = sensorManager.registerListener(
+                this,
+                accelerometer,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+        }
+
+        AppState.isSensorAvailable = registered
+        AppState.isWalking = registered
     }
 
     fun stopListening() {
@@ -36,25 +64,48 @@ class StepSensorManager(context: Context) : SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
+        if (event == null) return
 
-        val currentTotal = event.values[0].toLong()
+        when (event.sensor.type) {
+            Sensor.TYPE_STEP_DETECTOR -> {
+                // Cada evento representa exactamente 1 paso detectado
+                val stepsCount = event.values[0].toInt()
+                if (stepsCount > 0) {
+                    AppState.addSteps(stepsCount)
+                }
+            }
 
-        // Primera lectura: establecer el offset de inicio de sesion
-        if (sessionStartSteps < 0) {
-            sessionStartSteps = currentTotal
-            lastSensorValue = currentTotal
-            // Restaurar pasos guardados en Firestore como base del dia
-            // (AppState.steps ya fue cargado desde Firebase, no lo sobreescribimos)
-            return
-        }
+            Sensor.TYPE_STEP_COUNTER -> {
+                val currentTotal = event.values[0].toLong()
+                if (sessionStartCounter < 0) {
+                    sessionStartCounter = currentTotal
+                    lastCounterVal = currentTotal
+                    return
+                }
+                val delta = currentTotal - lastCounterVal
+                if (delta in 1..100) {
+                    AppState.addSteps(delta.toInt())
+                }
+                lastCounterVal = currentTotal
+            }
 
-        // Calcular pasos nuevos desde la ultima lectura (delta = 1 por cada paso real)
-        val delta = currentTotal - lastSensorValue
-        lastSensorValue = currentTotal
+            Sensor.TYPE_ACCELEROMETER -> {
+                // Algoritmo de detección de picos de aceleración (reserva universal)
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+                val magnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
 
-        if (delta > 0) {
-            AppState.addSteps(delta.toInt())
+                val deltaMagnitude = magnitude - lastAccelMagnitude
+                lastAccelMagnitude = magnitude
+
+                val now = System.currentTimeMillis()
+                // Umbral dinámico para evitar falsos positivos y rebotes (< 300 ms entre pasos)
+                if (deltaMagnitude > 3.2f && (now - lastStepTimestamp) > 320) {
+                    lastStepTimestamp = now
+                    AppState.addSteps(1)
+                }
+            }
         }
     }
 
