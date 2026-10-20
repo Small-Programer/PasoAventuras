@@ -270,6 +270,27 @@ fun DashboardScreen() {
                             color = if (AppState.isSensorAvailable) Color(0xFF15803D) else Color(0xFFD97706),
                             lineHeight = 14.sp
                         )
+
+                        if (!AppState.isSensorAvailable) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { AppState.onRequestPermissions?.invoke() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Activar sensor", fontSize = 11.sp, color = Color.White)
+                                }
+                                OutlinedButton(
+                                    onClick = { AppState.onOpenAppSettings?.invoke() },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Ajustes", fontSize = 11.sp, color = Color(0xFF92400E))
+                                }
+                            }
+                        }
                     }
                 }
 

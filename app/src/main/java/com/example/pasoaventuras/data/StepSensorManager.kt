@@ -40,34 +40,46 @@ class StepSensorManager(context: Context) : SensorEventListener {
     fun startListening() {
         var registered = false
 
-        // 1. PRIORIDAD MÁXIMA: Hardware Step Detector (no depende de orientación, el chip calcula la pisada)
+        // 1. PRIORIDAD MÁXIMA: Hardware Step Detector (chip físico dedicado)
         if (stepDetector != null) {
-            registered = sensorManager.registerListener(
-                this, 
-                stepDetector, 
-                SensorManager.SENSOR_DELAY_FASTEST
-            )
-            if (registered) activeSensorType = Sensor.TYPE_STEP_DETECTOR
+            try {
+                registered = sensorManager.registerListener(
+                    this, 
+                    stepDetector, 
+                    SensorManager.SENSOR_DELAY_UI
+                )
+                if (registered) activeSensorType = Sensor.TYPE_STEP_DETECTOR
+            } catch (_: Exception) {
+                registered = false
+            }
         }
 
-        // 2. SEGUNDA PRIORIDAD: Hardware Step Counter
+        // 2. SEGUNDA PRIORIDAD: Hardware Step Counter (acumulador por chip físico)
         if (!registered && stepCounter != null) {
-            registered = sensorManager.registerListener(
-                this, 
-                stepCounter, 
-                SensorManager.SENSOR_DELAY_UI
-            )
-            if (registered) activeSensorType = Sensor.TYPE_STEP_COUNTER
+            try {
+                registered = sensorManager.registerListener(
+                    this, 
+                    stepCounter, 
+                    SensorManager.SENSOR_DELAY_UI
+                )
+                if (registered) activeSensorType = Sensor.TYPE_STEP_COUNTER
+            } catch (_: Exception) {
+                registered = false
+            }
         }
 
-        // 3. TERCERA PRIORIDAD: Acelerómetro universal filtrando gravedad
+        // 3. TERCERA PRIORIDAD: Acelerómetro universal (funciona en tablets y cualquier dispositivo sin requerir permiso de actividad)
         if (!registered && accelerometer != null) {
-            registered = sensorManager.registerListener(
-                this,
-                accelerometer,
-                SensorManager.SENSOR_DELAY_GAME
-            )
-            if (registered) activeSensorType = Sensor.TYPE_ACCELEROMETER
+            try {
+                registered = sensorManager.registerListener(
+                    this,
+                    accelerometer,
+                    SensorManager.SENSOR_DELAY_UI
+                )
+                if (registered) activeSensorType = Sensor.TYPE_ACCELEROMETER
+            } catch (_: Exception) {
+                registered = false
+            }
         }
 
         AppState.isSensorAvailable = registered
@@ -77,7 +89,9 @@ class StepSensorManager(context: Context) : SensorEventListener {
     }
 
     fun stopListening() {
-        sensorManager.unregisterListener(this)
+        try {
+            sensorManager.unregisterListener(this)
+        } catch (_: Exception) {}
         AppState.isWalking = false
         sessionStartCounter = -1L
         lastCounterVal = -1L
@@ -134,13 +148,13 @@ class StepSensorManager(context: Context) : SensorEventListener {
                 val now = System.currentTimeMillis()
 
                 // Paso 4: Detección de paso humano con patrón pico-valle:
-                // Una pisada real genera entre 1.8 y 7.0 m/s². Agitar el celular genera picos erráticos > 9.0 o continuos.
-                if (currentMag > 2.0f && currentMag < 7.5f) {
+                // Una pisada real genera entre 1.8 y 7.0 m/s². Agitar el dispositivo genera picos erráticos > 8.0 o continuos.
+                if (currentMag > 1.8f && currentMag < 7.5f) {
                     if (currentMag > lastLinearMag) {
                         isPeak = true
-                    } else if (isPeak && (lastLinearMag - currentMag) > 0.4f) {
+                    } else if (isPeak && (lastLinearMag - currentMag) > 0.35f) {
                         isPeak = false
-                        // Una zancada humana al caminar toma entre 360 ms y 1200 ms (máximo ~2.7 pasos por segundo)
+                        // Una zancada humana al caminar toma entre 360 ms y 1300 ms
                         val elapsed = now - lastStepTimestamp
                         if (elapsed in 360..1300) {
                             lastStepTimestamp = now

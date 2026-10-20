@@ -33,9 +33,13 @@ object AppState {
     var currentSpeedKmh by mutableStateOf(0f)
     var gpsDistanceKm by mutableStateOf(0f)
 
-    fun addGpsDistance(km: Float) {
+        fun addGpsDistance(km: Float) {
         gpsDistanceKm += km
     }
+
+    // Callbacks para gestionar permisos desde la UI
+    var onRequestPermissions: (() -> Unit)? = null
+    var onOpenAppSettings: (() -> Unit)? = null
 
     // Economy
     var coins by mutableIntStateOf(0)

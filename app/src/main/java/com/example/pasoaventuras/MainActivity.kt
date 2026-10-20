@@ -1,9 +1,13 @@
 package com.example.pasoaventuras
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,21 +39,21 @@ class MainActivity : ComponentActivity() {
 
     private var showHardwareWarningDialog by mutableStateOf(false)
 
-    // Lanzador para permisos multiples (Actividad Fisica + GPS)
+    // Lanzador para permisos múltiples (Actividad Física + GPS)
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val activityGranted = permissions[Manifest.permission.ACTIVITY_RECOGNITION] ?: true
         val locationFineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
         val locationCoarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
 
+        // Intentar registrar el mejor sensor disponible (si no hay permiso de actividad, cae al acelerómetro)
         stepSensorManager.startListening()
 
         if (locationFineGranted || locationCoarseGranted) {
             locationTracker.start()
         }
 
-        // Si el dispositivo no tiene chip de hardware dedicado de podometro, avisar al usuario
+        // Si el dispositivo no tiene chip de hardware dedicado de podómetro, avisar al usuario
         if (!stepSensorManager.hasHardwarePedometer) {
             showHardwareWarningDialog = true
         }
@@ -58,9 +62,23 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Mantener la pantalla encendida mientras la app esté abierta para evitar suspensión abrupta en tablets
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         // Inicializar administradores de hardware
         stepSensorManager = StepSensorManager(this)
         locationTracker = LocationTracker(this)
+
+        // Enlazar callbacks de UI
+        AppState.onRequestPermissions = {
+            checkAndRequestPermissions()
+        }
+        AppState.onOpenAppSettings = {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+            startActivity(intent)
+        }
 
         // Estado inicial
         AppState.init()
@@ -84,7 +102,7 @@ class MainActivity : ComponentActivity() {
 
                 var isLoggedIn by remember { mutableStateOf(AppState.isLoggedIn) }
 
-                // Alerta al iniciar si el dispositivo no cuenta con sensor de podometro por hardware dedicado
+                // Alerta al iniciar si el dispositivo no cuenta con sensor de podómetro por hardware dedicado
                 if (showHardwareWarningDialog) {
                     AlertDialog(
                         onDismissRequest = { showHardwareWarningDialog = false },
@@ -112,7 +130,6 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     Scaffold(
-                        modifier = Modifier.fillMaxSize(),
                         bottomBar = {
                             BottomNavBar(
                                 currentRoute = currentRoute,
@@ -131,7 +148,9 @@ class MainActivity : ComponentActivity() {
                         NavHost(
                             navController = navController,
                             startDestination = "dashboard",
-                            modifier = Modifier.padding(innerPadding)
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
                         ) {
                             composable("dashboard") { DashboardScreen() }
                             composable("misiones") { MisionesScreen() }
@@ -192,10 +211,12 @@ class MainActivity : ComponentActivity() {
             permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
 
+        // Iniciar siempre el sensor (si no tiene permisos de actividad, caerá al acelerómetro seguro)
+        stepSensorManager.startListening()
+
         if (permissionsToRequest.isNotEmpty()) {
             requestPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
-            stepSensorManager.startListening()
             locationTracker.start()
             if (!stepSensorManager.hasHardwarePedometer) {
                 showHardwareWarningDialog = true
