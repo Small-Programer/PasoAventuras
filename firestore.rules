@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Matches the Firebase Auth UID)
+    //
+    // Fields:
+    //   - userName: string (required, 0-100 chars) - Player display name or 'Invitado'
+    //   - userEmail: string (required, 0-150 chars) - Registered email or guest placeholder
+    //   - userAvatar: string (optional, 0-50 chars) - Avatar identifier
+    //   - level: int (required, 1-1000) - Player level
+    //   - xp: int (required, >= 0) - Experience points
+    //   - streak: int (optional, >= 0) - Active streak in days
+    //   - steps: int (required, >= 0) - Daily steps recorded
+    //   - totalSteps: int (optional, >= 0) - Cumulative lifetime steps
+    //   - dailyGoal: int (optional, >= 0) - Target daily step goal
+    //   - coins: int (required, >= 0) - In-game coin currency
+    //   - ownedCardIds: list (optional, max 500 items) - Collected card IDs
+    //   - claimedMissionIds: list (optional, max 500 items) - Claimed mission IDs
+    //   - missionsProgress: map (optional, max 100 entries) - Mission progress state
+    //   - lastDailyDate: string (optional, 0-30 chars) - Last daily reset date ('YYYY-MM-DD')
+    //   - lastWeeklyYearWeek: string (optional, 0-30 chars) - Last weekly reset key ('YYYY-W45')
+    //   - dailyStepsHistory: map (optional, max 365 entries) - Step history map ('YYYY-MM-DD' -> count)
+    //   - gpsDistanceKm: number (optional, >= 0) - Distance tracked by GPS in km
+    //   - isAnonymous: bool (required) - True if session was created anonymously
+    //   - updatedAt: number (required, >= 0) - Timestamp in epoch milliseconds
+    //   - uid: string (optional, must match userId if present)
+    //
+    // ===============================================================
+
+    // Default Deny: Deny all reads and writes by default across the database
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Verify user is authenticated with Firebase Auth (Email/Pass or Anonymous)
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Verify user is the owner of the document based on path UID
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Verify document contains ONLY allowed schema fields (prevents schema pollution)
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Verify document contains all mandatory baseline fields
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Helper for string length validation
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // Helper for number validation (supports int and float)
+    function isValidNumber(val, minVal, maxVal) {
+      return (val is int || val is float) && val >= minVal && val <= maxVal;
+    }
+
+    // Helper for non-negative integers
+    function isValidInt(val, minVal, maxVal) {
+      return val is int && val >= minVal && val <= maxVal;
+    }
+
+    // ===============================================================
+    // Domain Validator: User Document
+    // ===============================================================
+
+    function isValidUserDoc(data, userId) {
+      let allowedFields = [
+        'userName', 'userEmail', 'userAvatar',
+        'level', 'xp', 'streak', 'steps', 'totalSteps',
+        'dailyGoal', 'coins', 'ownedCardIds', 'claimedMissionIds',
+        'missionsProgress', 'lastDailyDate', 'lastWeeklyYearWeek',
+        'dailyStepsHistory', 'gpsDistanceKm', 'isAnonymous',
+        'updatedAt', 'uid'
+      ];
+
+      let requiredFields = [
+        'userName', 'userEmail', 'level', 'xp',
+        'steps', 'coins', 'isAnonymous', 'updatedAt'
+      ];
+
+      return hasOnlyAllowedFields(allowedFields) &&
+             hasRequiredFields(requiredFields) &&
+             // Core required fields validation
+             isValidString(data.userName, 0, 100) &&
+             isValidString(data.userEmail, 0, 150) &&
+             isValidInt(data.level, 1, 1000) &&
+             isValidInt(data.xp, 0, 100000000) &&
+             isValidInt(data.steps, 0, 500000) &&
+             isValidInt(data.coins, 0, 100000000) &&
+             data.isAnonymous is bool &&
+             isValidNumber(data.updatedAt, 0, 9999999999999) &&
+             // Optional fields validation (safe bounds if present)
+             (!('userAvatar' in data) || isValidString(data.userAvatar, 0, 50)) &&
+             (!('streak' in data) || isValidInt(data.streak, 0, 36500)) &&
+             (!('totalSteps' in data) || isValidInt(data.totalSteps, 0, 1000000000)) &&
+             (!('dailyGoal' in data) || isValidInt(data.dailyGoal, 0, 200000)) &&
+             (!('gpsDistanceKm' in data) || isValidNumber(data.gpsDistanceKm, 0, 50000)) &&
+             (!('lastDailyDate' in data) || isValidString(data.lastDailyDate, 0, 30)) &&
+             (!('lastWeeklyYearWeek' in data) || isValidString(data.lastWeeklyYearWeek, 0, 30)) &&
+             (!('ownedCardIds' in data) || (data.ownedCardIds is list && data.ownedCardIds.size() <= 500)) &&
+             (!('claimedMissionIds' in data) || (data.claimedMissionIds is list && data.claimedMissionIds.size() <= 500)) &&
+             (!('missionsProgress' in data) || (data.missionsProgress is map && data.missionsProgress.size() <= 100)) &&
+             (!('dailyStepsHistory' in data) || (data.dailyStepsHistory is map && data.dailyStepsHistory.size() <= 365)) &&
+             (!('uid' in data) || (data.uid is string && data.uid == userId));
+    }
+
+    // ===============================================================
+    // Collection: users
+    // ===============================================================
+
+    match /users/{userId} {
+      // READ: Users can ONLY read their own document (protects PII and game progress)
+      allow get: if isOwner(userId);
+      allow list: if false; // Disallows querying across all users to prevent enumeration & data leaks
+
+      // CREATE: Authenticated users can create their own document if schema is valid
+      allow create: if isOwner(userId) && isValidUserDoc(request.resource.data, userId);
+
+      // UPDATE: Authenticated users can update their own document if new schema is valid
+      allow update: if isOwner(userId) && isValidUserDoc(request.resource.data, userId);
+
+      // DELETE: Users can delete their own document (e.g. guest logout in FirebaseManager.logout())
+      allow delete: if isOwner(userId);
+    }
+  }
+}
