@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Eliminación de Cuenta - PasoAventuras</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #334155;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+            background-color: #f8fafc;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1e293b;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+        }
+        h2 {
+            color: #334155;
+            margin-top: 24px;
+        }
+        p, li {
+            font-size: 15px;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .steps-box {
+            background-color: #f1f5f9;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            border-radius: 0 8px 8px 0;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <span class="badge">PasoAventuras</span>
+        <h1>Solicitud de Eliminación de Cuenta y Datos</h1>
+        <p>En cumplimiento con las políticas de privacidad de Google Play y el compromiso con nuestros usuarios, en <strong>PasoAventuras</strong> garantizamos tu derecho a eliminar completamente tu cuenta y la totalidad de los datos asociados a tu actividad de juego.</p>
+
+        <h2>Pasos para solicitar la eliminación de tu cuenta</h2>
+        <div class="steps-box">
+            <p><strong>Opción 1: Directamente desde la aplicación</strong></p>
+            <ol>
+                <li>Abre <strong>PasoAventuras</strong> en tu dispositivo.</li>
+                <li>Dirígete a la pestaña <strong>Perfil</strong> en la barra de navegación inferior.</li>
+                <li>Si iniciaste sesión como Invitado, al presionar <strong>Cerrar sesión</strong>, tu perfil y datos temporales en Firebase Firestore se borran de manera automática e inmediata.</li>
+            </ol>
+            <p><strong>Opción 2: Vía Correo Electrónico de Soporte</strong></p>
+            <p>Si desinstalaste la app o deseas que eliminemos tu registro manualmente de nuestros servidores de Firebase:</p>
+            <ul>
+                <li>Envía un correo electrónico a nuestro equipo de soporte con el asunto: <em>"Eliminar cuenta de PasoAventuras"</em>.</li>
+                <li>Indica la dirección de correo electrónico vinculada a tu cuenta de juego.</li>
+                <li>Procesaremos la solicitud en un plazo máximo de 48 horas hábiles.</li>
+            </ul>
+        </div>
+
+        <h2>Tipos de datos que se eliminarán</h2>
+        <ul>
+            <li><strong>Credenciales de autenticación:</strong> Correo electrónico y contraseña almacenados en Firebase Authentication.</li>
+            <li><strong>Perfil de juego:</strong> Nombre de usuario, avatar, nivel, experiencia (XP) y racha de días activos.</li>
+            <li><strong>Historial de pasos y distancia:</strong> Registros acumulados de pasos diarios, distancia GPS registrada y calorías estimadas.</li>
+            <li><strong>Inventario virtual:</strong> Colección de cartas obtenidas, misiones completadas y balance de ChoyoCoins.</li>
+        </ul>
+
+        <h2>Período de retención de datos</h2>
+        <p>Una vez confirmada la eliminación de la cuenta, todos los datos personales y registros de juego se eliminan permanentemente de nuestra base de datos de Google Cloud Firestore sin conservar copias de retención.</p>
+    </div>
+</body>
+</html>
